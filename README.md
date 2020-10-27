@@ -6,7 +6,7 @@
    1. checks if an application has more older snapshots than required
    1. deletes older snapshots and retains most recent
 
-This will be deployed as a [AWS Lambda](https://aws.amazon.com/lambda/) function and scheduled using [Amazon CloudWatch Events](https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/WhatIsCloudWatchEvents.html) e.g. once in a day or week.
+This will be deployed as an [AWS Lambda](https://aws.amazon.com/lambda/) function and scheduled using [Amazon CloudWatch Events](https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/WhatIsCloudWatchEvents.html) e.g. once in a day or week.
 
 ---
 
