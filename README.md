@@ -45,7 +45,7 @@ The following AWS services are required to deploy this starter kit:
 
 ## Deployment Instructions using AWS Console
 
-1. Create an SNS Topic and subscriber the required e-mail id(s)
+1. Create an SNS Topic and subscribe required e-mail id(s)
 1. Create a DynamoDB Table
    1. Table name= ```flink_snapshot_manager_status```
    1. Primary partition key: name= ```flink_app_name```, type= String
@@ -78,7 +78,6 @@ The following AWS services are required to deploy this starter kit:
          | sns_topic_arn | ```SNS Topic ARN``` | SNS Topic ARN  |
          | number_of_older_snapshots_to_retain | ```30``` | The number of most recent snapshots to be retained  |
          | snapshot_creation_wait_time_seconds | ```15``` | Time gap in seconds between consecutive checks to get the status of snapshot creation  |
-
 ---
 
 ## License Summary
