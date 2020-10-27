@@ -1,0 +1,15 @@
+{
+    "TableName": "flink_snapshot_manager_status",
+    "KeySchema": [
+      { "AttributeName": "flink_app_name", "KeyType": "HASH" },
+      { "AttributeName": "snapshot_manager_run_id", "KeyType": "RANGE" }
+    ],
+    "AttributeDefinitions": [
+      { "AttributeName": "flink_app_name", "AttributeType": "S" },
+      { "AttributeName": "snapshot_manager_run_id", "AttributeType": "N" }
+    ],
+    "ProvisionedThroughput": {
+      "ReadCapacityUnits": 5,
+      "WriteCapacityUnits": 5
+    }
+}
