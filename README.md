@@ -1,6 +1,6 @@
-# Amazon Kinesis Data Analytics Flink Snapshot Manager
+# Amazon Kinesis Data Analytics Snapshot Manager for Flink
 
-[Amazon Kinesis Data Analytics Flink](https://docs.aws.amazon.com/kinesisanalytics/latest/java/how-it-works.html) Snapshot Manager offers the following benefits:
+[Amazon Kinesis Data Analytics](https://docs.aws.amazon.com/kinesisanalytics/latest/java/how-it-works.html) Snapshot Manager for Flink offers the following benefits:
 
    1. takes a new snapshot
    1. checks if an application has more older snapshots than required
@@ -67,7 +67,7 @@ The following AWS services are required to deploy this starter kit:
         1. Timeout = e.g. 5 minutes
         1. Memory = e.g. 128 MB
     1. Environment variable = as defined in the following table
-    
+
          | Key   | Value  | Description |
          |-------| -------| ----------- |
          | region  | us-east-1 | AWS region |
@@ -78,6 +78,7 @@ The following AWS services are required to deploy this starter kit:
          | sns_topic_arn | ```SNS Topic ARN``` | SNS Topic ARN  |
          | number_of_older_snapshots_to_retain | ```30``` | The number of most recent snapshots to be retained  |
          | snapshot_creation_wait_time_seconds | ```15``` | Time gap in seconds between consecutive checks to get the status of snapshot creation  |
+
 ---
 
 ## License Summary
