@@ -82,7 +82,7 @@ def lambda_handler(event, context):
 
         # check if the number of historical snapshots exceeds the threshold. If yes, delete them one by one
         if len(sorted_snapshots) > num_of_older_snapshots_to_retain:
-            snapshots_to_be_deleted = sorted_snapshots[num_of_older_snapshots_to_retain:-1]
+            snapshots_to_be_deleted = sorted_snapshots[num_of_older_snapshots_to_retain:-None]
             for snapshot_to_be_deleted in snapshots_to_be_deleted:
                 snapshot_deleted = delete_snapshot(kinesis_analytics, flink_app_name, snapshot_to_be_deleted)
                 if snapshot_deleted:
