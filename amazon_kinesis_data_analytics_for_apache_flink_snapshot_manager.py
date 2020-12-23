@@ -16,17 +16,15 @@ logger.setLevel(logging.INFO)
 
 def lambda_handler(event, context):
     """
-    AWS Lambda function's entry point. It takes a snapshot of a KDA Flink application, retains the most recent X
-    snapshots, and deletes the rest. For X, see parameter 'num_of_older_snapshots_to_retain'.
-    :param event:
-    :param context:
-    :return:
+    AWS Lambda function's handler function. It takes a snapshot of a Kinesis Data Analytics Flink application,
+    retains the most recent X number of snapshots, and deletes the rest. For X, see parameter
+    'num_of_older_snapshots_to_retain'. :param event: :param context: :return:
     """
-    print('Event received.', json.dumps(event, indent=4))
+    print('Running Snapshot Manager. Input event:', json.dumps(event, indent=4))
     # read environment variables
     region = os.environ['aws_region']
-    flink_app_name = os.environ['kda_flink_app_name']
-    ddb_table_name = os.environ['flink_app_snapshot_manager_table']
+    flink_app_name = os.environ['app_name']
+    ddb_table_name = os.environ['snapshot_manager_ddb_table_name']
     primary_partition_key_name = os.environ['primary_partition_key_name']
     primary_sort_key_name = os.environ['primary_sort_key_name']
     sns_topic_arn = os.environ['sns_topic_arn']
@@ -39,91 +37,129 @@ def lambda_handler(event, context):
     kinesis_analytics = boto3.client('kinesisanalyticsv2', region)
 
     # initialize variables
-    return_response = {}
-    sorted_snapshots = []
     deleted_snapshots = []
     not_deleted_snapshots = []
-    snapshot_deletion_status = {}
-    snapshot_completed = False
+    snapshot_deletion_status = {
+        "deleted_snapshots":  deleted_snapshots,
+        "not_deleted_snapshots": not_deleted_snapshots
+    }
     snapshot_manager_run_id = int(round(time.time() * 1000))
     snapshot_name = 'custom_' + str(snapshot_manager_run_id)
+    response_body = {
+        "app_name": flink_app_name,
+        "app_version": "",
+        "snapshot_manager_run_id": snapshot_manager_run_id,
+        "new_snapshot_name": snapshot_name,
+        "app_is_running": True,
+        "app_is_healthy": True,
+        "new_snapshot_initiated": False,
+        "new_snapshot_completed": False,
+        "new_snapshot_creation_delayed": False,
+        "old_snapshots_to_be_deleted": False,
+        "num_of_snapshot_deleted": 0,
+        "num_of_snapshot_not_deleted": 0
+    }
+    print('Snapshot Manager Execution Status. Run Id: {0}'.format(snapshot_manager_run_id))
 
     # describe application to get application status and current version
     response = describe_flink_application(kinesis_analytics, flink_app_name)
+    response_body['app_version'] = response['ApplicationDetail']['ApplicationVersionId']
 
+    # If application is running then takes a snapshot
     if response['ApplicationDetail']['ApplicationStatus'] == 'RUNNING':
         snapshot_creation_res = take_app_snapshot(kinesis_analytics, flink_app_name, snapshot_name)
-        snapshot_creation_res['app_version'] = response['ApplicationDetail']['ApplicationVersionId']
-        print("Snapshot creation initiated: {0}, name: {1}.".format(snapshot_creation_res['is_initiated'],
-                                                                    snapshot_creation_res['snapshot_name']))
-
-        # If the snapshot creation is initiated then check if it is completed
         if snapshot_creation_res['is_initiated']:
-            return_response = {'statusCode': 200, 'body': json.dumps('Snapshot creation request was successful!')}
-            max_checks = 4
-            checks_done = 0
-            while checks_done < max_checks:
-                time.sleep(snapshot_creation_wait_time_seconds)
-                snapshots = list_flink_app_snapshots(kinesis_analytics, flink_app_name,
-                                                     response['ApplicationDetail']['ApplicationVersionId'])
-                print('Application {0} of version {1} has {2} snapshots: ', flink_app_name,
-                      response['ApplicationDetail']['ApplicationVersionId'], len(snapshots))
-                sorted_snapshots = sorted(snapshots, key=lambda k: k['SnapshotCreationTimestamp'], reverse=True)
-                latest_snapshot = sorted_snapshots[0]
-                if latest_snapshot['SnapshotName'] == snapshot_creation_res['snapshot_name']:
-                    if latest_snapshot['SnapshotStatus'] == 'READY':
-                        snapshot_completed = True
-                        checks_done = 4
-                        print('Snapshot crated successfully. Snapshot: {0}'.format(latest_snapshot))
-                    else:
-                        checks_done += 1
-                else:
-                    print('No checkpoint found with the name: {0}'.format(snapshot_creation_res['snapshot_name']))
-
-        # check if the number of historical snapshots exceeds the threshold. If yes, delete them one by one
-        if len(sorted_snapshots) > num_of_older_snapshots_to_retain:
-            snapshots_to_be_deleted = sorted_snapshots[num_of_older_snapshots_to_retain:-None]
-            for snapshot_to_be_deleted in snapshots_to_be_deleted:
-                snapshot_deleted = delete_snapshot(kinesis_analytics, flink_app_name, snapshot_to_be_deleted)
-                if snapshot_deleted:
-                    deleted_snapshots.append(snapshot_to_be_deleted)
-                    print(
-                        'Snapshot deleted: {0}, name: {1}'.format(snapshot_deleted,
-                                                                  snapshot_to_be_deleted['SnapshotName']))
-                else:
-                    not_deleted_snapshots.append(snapshot_to_be_deleted)
-
-            # add deleted and not-deleted snapshots to snapshot_deletion_status dictionary
-            snapshot_deletion_status['deleted_snapshots'] = deleted_snapshots
-            snapshot_deletion_status['not_deleted_snapshots'] = not_deleted_snapshots
+            response_body['new_snapshot_initiated'] = True
         else:
-            logger.info('Number of historical snapshots less than the threshold. No need to delete any snapshots.')
-
-        # insert Snapshot manager status to DynamoDB
-        if snapshot_completed or len(snapshot_deletion_status['deleted_snapshots']) > 0 or len(
-                snapshot_deletion_status['not_deleted_snapshots']) > 0:
-            track_snapshot_manager_status(dynamodb, ddb_table_name, primary_partition_key_name, primary_sort_key_name,
-                                          flink_app_name, snapshot_manager_run_id, latest_snapshot,
-                                          snapshot_deletion_status)
-
-        # Send SNS notification
-        if snapshot_completed:
-            send_sns_notification(sns, sns_topic_arn, flink_app_name, snapshot_manager_run_id, snapshot_name,
-                                  latest_snapshot, True)
-        else:
-            send_sns_notification(sns, sns_topic_arn, flink_app_name, snapshot_manager_run_id,
-                                  snapshot_name, None, False)
+            response_body['app_is_healthy'] = False
     else:
-        print('Flink application {0} is not running. A new snapshot cannot be taken.')
-        return_response = {'statusCode': 300, 'body': json.dumps('Snapshot creation request was not successful!')}
-        notify_when_app_is_not_running(sns, sns_topic_arn, flink_app_name, snapshot_manager_run_id)
+        response_body['app_is_running'] = False
+        error_message = 'A new snapshot cannot be taken. Flink application {0} is not running.'.format(flink_app_name)
+        print(error_message)
+        notify_error(sns, sns_topic_arn, flink_app_name, snapshot_manager_run_id, error_message)
 
+    # If application is not healthy then send a notification
+    if not response_body['app_is_healthy']:
+        error_message = 'A new snapshot cannot be taken now. Flink application {0} may not be healthy.'.format(
+            flink_app_name)
+        print(error_message)
+        notify_error(sns, sns_topic_arn, flink_app_name, snapshot_manager_run_id, error_message)
+
+    # If new snapshot creation initiated then check if it is completed
+    max_checks = 4
+    checks_done = 0
+    if response_body['new_snapshot_initiated']:
+        while checks_done < max_checks:
+            time.sleep(snapshot_creation_wait_time_seconds)
+            snapshots = list_flink_app_snapshots(kinesis_analytics, flink_app_name, response_body['app_version'])
+            print('Application {0} of version {1} has {2} snapshots: '.format(flink_app_name,
+                                                                              response_body['app_version'],
+                                                                              len(snapshots)))
+            sorted_snapshots = sorted(snapshots, key=lambda k: k['SnapshotCreationTimestamp'], reverse=True)
+            latest_snapshot = sorted_snapshots[0]
+            if latest_snapshot['SnapshotName'] == snapshot_creation_res['snapshot_name']:
+                if latest_snapshot['SnapshotStatus'] == 'READY':
+                    checks_done = 4
+                    response_body['new_snapshot_completed'] = True
+                    print(response_body)
+                    send_sns_notification(sns, sns_topic_arn, flink_app_name, snapshot_manager_run_id, snapshot_name,
+                                          latest_snapshot, True)
+                else:
+                    checks_done += 1
+            else:
+                print('No snapshot found with the name: {0}'.format(snapshot_creation_res['snapshot_name']))
+
+    if checks_done == 4 and not response_body['new_snapshot_completed']:
+        print('I am here')
+        response_body['new_snapshot_creation_delayed'] = True
+
+    # If newly initiated snapshot is not completed on time then send a notification
+    if response_body['new_snapshot_creation_delayed']:
+        send_sns_notification(sns, sns_topic_arn, flink_app_name, snapshot_manager_run_id, snapshot_name, None, False)
+    
+    if response_body['new_snapshot_completed']:
+        num_of_snapshots_after_new_snapshot = list_flink_app_snapshots(kinesis_analytics, flink_app_name,
+                                                                       response['ApplicationDetail'][
+                                                                           'ApplicationVersionId'])
+        # check if the number of old snapshots exceeds the threshold.
+        if len(num_of_snapshots_after_new_snapshot) > num_of_older_snapshots_to_retain:
+            response_body['old_snapshots_to_be_deleted'] = True
+
+    # initiate old snapshot deletion process
+    if response_body['old_snapshots_to_be_deleted']:
+        sorted_snapshots_after_new_snapshots = sorted(num_of_snapshots_after_new_snapshot,
+                                                      key=lambda k: k['SnapshotCreationTimestamp'], reverse=True)
+        snapshots_to_be_deleted = sorted_snapshots_after_new_snapshots[num_of_older_snapshots_to_retain:None]
+        for snapshot_to_be_deleted in snapshots_to_be_deleted:
+            snapshot_deleted = delete_snapshot(kinesis_analytics, flink_app_name, snapshot_to_be_deleted)
+            if snapshot_deleted:
+                deleted_snapshots.append(snapshot_to_be_deleted)
+                print(
+                    'Snapshot deleted: {0}, name: {1}'.format(snapshot_deleted,
+                                                              snapshot_to_be_deleted['SnapshotName']))
+            else:
+                not_deleted_snapshots.append(snapshot_to_be_deleted)
+        # add deleted and not-deleted snapshots to snapshot_deletion_status dictionary
+        snapshot_deletion_status['deleted_snapshots'] = deleted_snapshots
+        snapshot_deletion_status['not_deleted_snapshots'] = not_deleted_snapshots
+        response_body['num_of_snapshot_deleted'] = len(deleted_snapshots)
+        response_body['num_of_snapshot_not_deleted'] = len(not_deleted_snapshots)
+    else:
+        logger.info('Number of historical snapshots less than the threshold. No need to delete any snapshots.')
+
+    # Tracking and Notifications
+    if response_body['new_snapshot_completed']:
+        track_snapshot_manager_status(dynamodb, ddb_table_name, primary_partition_key_name, primary_sort_key_name,
+                                      flink_app_name, snapshot_manager_run_id, latest_snapshot,
+                                      snapshot_deletion_status)
+
+    return_response = {'statusCode': 200, 'body': json.dumps(response_body)}
     return return_response
 
 
 def describe_flink_application(kin_analytics, flink_app_name):
     """
-    This function describes a KDA Flink Application
+    This function describes a Kinesis Data Analytics Flink Application
     :param kin_analytics:
     :param flink_app_name:
     :return:
@@ -140,7 +176,7 @@ def describe_flink_application(kin_analytics, flink_app_name):
 
 def list_flink_app_snapshots(kin_analytics, flink_app_name, app_ver_id):
     """
-    This function get a list of snapshots for a KDA Flink Application
+    This function get a list of snapshots for a Kinesis Data Analytics Flink Application
     :param kin_analytics:
     :param flink_app_name:
     :param app_ver_id:
@@ -245,7 +281,7 @@ def notify_when_app_is_not_running(sns, topic_arn, flink_app_name, snapshot_mana
                 """.format(snapshot_manager_run_id, flink_app_name)
     try:
         pub_response = sns.publish(TopicArn=topic_arn, Message=message,
-                                   Subject='KDA Flink Snapshot Manager Alert')
+                                   Subject='Kinesis Data Analytics Flink Snapshot Manager Alert')
         if pub_response['ResponseMetadata']['HTTPStatusCode'] == 200:
             message_sent = True
             logger.info(
@@ -312,7 +348,7 @@ def send_sns_notification(sns, topic_arn, flink_app_name, snapshot_manager_run_i
             """.format(snapshot_manager_run_id, flink_app_name, snapshot_name, datetime.datetime.now())
     try:
         pub_response = sns.publish(TopicArn=topic_arn, Message=message,
-                                   Subject='KDA Flink Snapshot Manager Alert')
+                                   Subject='Kinesis Data Analytics Flink Snapshot Manager Alert')
         if pub_response['ResponseMetadata']['HTTPStatusCode'] == 200:
             message_sent = True
             logger.info(

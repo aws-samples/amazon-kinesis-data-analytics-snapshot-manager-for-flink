@@ -72,9 +72,9 @@ The following AWS services are required to deploy this starter kit:
 
          | Key   | Value  | Description |
          |-------| -------| ----------- |
-         | region  | us-east-1 | AWS region |
+         | aws_region  | us-east-1 | AWS region |
          | app_name | ```Application Name``` | Application name of Kinesis Data Analytics for Apache Flink |
-         | snapshot_manager_table  | ```snapshot_manager_status``` | Name of the DynamoDB table used to track the status |
+         | snapshot_manager_ddb_table_name  | ```snapshot_manager_status``` | Name of the DynamoDB table used to track the status |
          | primary_partition_key_name | ```app_name``` | Primary partition key name |
          | primary_sort_key_name | ```snapshot_manager_run_id``` | Primary sort key name |
          | sns_topic_arn | ```SNS Topic ARN``` | SNS Topic ARN  |
