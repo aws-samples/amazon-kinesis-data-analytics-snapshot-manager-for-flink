@@ -58,14 +58,14 @@ The following AWS services are required to deploy this starter kit:
    1. IAM policy with name ```iam_policy_sns``` using [this sample](./resources/iam_policy_sns.json)
    1. IAM policy with name ```iam_policy_kinesisanalytics``` using [this sample](./resources/iam_policy_kinesisanalytics.json)
    1. IAM policy with name ```iam_policy_cloudwatch_logs``` using [this sample](./resources/iam_policy_cloudwatch_logs.json)
-1. Create an IAM role with name ```snapshot_manager_iam_role``` and attach above policies
+1. Create an IAM role for Lambda with name ```snapshot_manager_iam_role``` and attach above policies
 1. Deploy **snapshot_manager** function
 
     1. Function name = snapshot_manager
     1. Runtime = Python 3.7
     1. IAM role = snapshot_manager_iam_role
     1. Function code = Copy the contents from [amazon_kinesis_data_analytics_for_apache_flink_snapshot_manager.py](./amazon_kinesis_data_analytics_for_apache_flink_snapshot_manager.py)
-    1. Under basic settings:
+    1. Under General configuration:
         1. Timeout = e.g. 5 minutes
         1. Memory = e.g. 128 MB
     1. Environment variable = as defined in the following table
@@ -80,6 +80,12 @@ The following AWS services are required to deploy this starter kit:
          | sns_topic_arn | ```SNS Topic ARN``` | SNS Topic ARN  |
          | number_of_older_snapshots_to_retain | ```30``` | The number of most recent snapshots to be retained  |
          | snapshot_creation_wait_time_seconds | ```15``` | Time gap in seconds between consecutive checks to get the status of snapshot creation  |
+1. Create ```snapshot_manager_rule``` EventBridge rule
+
+    1. Rule name = ```SnapshotManagerEventRule```
+    1. Pattern = ```Schedule``` with desired fixed rate e.g. 6 Hours 
+    1. Target = Previously created lambda Function ```snapshot_manager```
+ 
 
 ---
 

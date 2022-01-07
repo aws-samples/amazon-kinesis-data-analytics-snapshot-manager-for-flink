@@ -110,7 +110,7 @@ def lambda_handler(event, context):
                 print('No snapshot found with the name: {0}'.format(snapshot_creation_res['snapshot_name']))
 
     if checks_done == 4 and not response_body['new_snapshot_completed']:
-        print('I am here')
+        print("Snapshot creation has been delayed")
         response_body['new_snapshot_creation_delayed'] = True
 
     # If newly initiated snapshot is not completed on time then send a notification
