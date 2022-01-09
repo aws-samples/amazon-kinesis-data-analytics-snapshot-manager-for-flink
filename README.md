@@ -7,23 +7,35 @@ Snapshot Manager - [Amazon Kinesis Data Analytics](https://docs.aws.amazon.com/k
    1. checks if the count is more than the required number of snapshots
    1. deletes older snapshots that are older than the required number
 
-This will be deployed as an [AWS Lambda](https://aws.amazon.com/lambda/) function and scheduled using [Amazon CloudWatch Events](https://docs.aws.amazon.com/AmazonCloudWatch/latest/events/WhatIsCloudWatchEvents.html) e.g. once in a day or week.
+This will be deployed as an [AWS Lambda](https://aws.amazon.com/lambda/) function and scheduled using [Amazon EventBridge rules](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rules.html) e.g. once in a day or week.
+
+**Contents:**
+
+* [Architecture](#architecture)
+* [Process flow diagram](#process-flow-diagram)
+* [Prerequisites](#prerequisites)
+* [AWS service requirements](#aws-service-requirements)
+* [Deployment instructions using AWS console](#deployment-instructions-using-aws-console)
 
 ---
 
 ## Architecture
 
-![Alt](./amazon_kinesis_data_analytics_for_apache_flink_snapshot_manager.png)
+Figure below represents the architecture of Snapshot Manager.
+
+![Alt](./resources/Snapshot_manager-architecture.png)
 
 ---
 
-## Process Flow Diagram
+## Process flow diagram
 
-![Alt](./amazon_kinesis_data_analytics_for_apache_flink_snapshot_manager_flow_diagram.png)
+Figure below represents the process flow of Snapshot Manager.
+
+![Alt](./resources/Snapshot_manager-process_flow.png)
 
 ---
 
-## Pre-requisites
+## Prerequisites
 
   1. Python 3.7
   1. IDE e.g. [PyCharm](https://www.jetbrains.com/pycharm/)
@@ -32,7 +44,7 @@ This will be deployed as an [AWS Lambda](https://aws.amazon.com/lambda/) functio
 
 ---
 
-## AWS Service Requirements
+## AWS service requirements
 
 The following AWS services are required to deploy this starter kit:
 
@@ -44,7 +56,7 @@ The following AWS services are required to deploy this starter kit:
 
 ---
 
-## Deployment Instructions using AWS Console
+## Deployment instructions using AWS console
 
 1. Create an SNS Topic and subscribe required e-mail id(s)
 1. Create a DynamoDB Table
@@ -61,9 +73,9 @@ The following AWS services are required to deploy this starter kit:
 1. Create an IAM role for Lambda with name ```snapshot_manager_iam_role``` and attach above policies
 1. Deploy **snapshot_manager** function
 
-    1. Function name = snapshot_manager
+    1. Function name = ```snapshot_manager```
     1. Runtime = Python 3.7
-    1. IAM role = snapshot_manager_iam_role
+    1. IAM role = Select ```snapshot_manager_iam_role``` created above
     1. Function code = Copy the contents from [amazon_kinesis_data_analytics_for_apache_flink_snapshot_manager.py](./amazon_kinesis_data_analytics_for_apache_flink_snapshot_manager.py)
     1. Under General configuration:
         1. Timeout = e.g. 5 minutes
@@ -80,11 +92,14 @@ The following AWS services are required to deploy this starter kit:
          | sns_topic_arn | ```SNS Topic ARN``` | SNS Topic ARN  |
          | number_of_older_snapshots_to_retain | ```30``` | The number of most recent snapshots to be retained  |
          | snapshot_creation_wait_time_seconds | ```15``` | Time gap in seconds between consecutive checks to get the status of snapshot creation  |
-1. Create ```snapshot_manager_rule``` EventBridge rule
-
-    1. Rule name = ```SnapshotManagerEventRule```
-    1. Pattern = ```Schedule``` with desired fixed rate e.g. 6 Hours 
-    1. Target = Previously created lambda Function ```snapshot_manager```
+1. Go to Amazon Create EventBridge and create a rule
+   
+   1. Name = ```SnapshotManagerEventRule```
+   1. Description = EventBridge Rule to invoke Snapshot Manager Lambda
+   1. Define pattern = ```Schedule``` with desired fixed rate e.g. 6 Hours 
+   1. Select targets
+      1. Target = Lambda function
+      1. Function = Previously created lambda Function ```snapshot_manager```
  
 
 ---
