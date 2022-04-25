@@ -74,16 +74,27 @@ def lambda_handler(event, context):
             response_body['app_is_healthy'] = False
     else:
         response_body['app_is_running'] = False
-        error_message = 'A new snapshot cannot be taken. Flink application {0} is not running.'.format(flink_app_name)
+        # error_message = 'A new snapshot cannot be taken. Flink application {0} is not running.'.format(flink_app_name)
+        error_message = """
+                    Application Team:
+
+                    Snapshot Manager execution completed. Run Id: {0}. However, a new snapshot has not been taken.
+                    The application {1} is not running.
+                    """.format(snapshot_manager_run_id, flink_app_name)
+
         print(error_message)
-        notify_error(sns, sns_topic_arn, flink_app_name, snapshot_manager_run_id, error_message)
+        notify_error(sns, sns_topic_arn, error_message)
 
     # If application is not healthy then send a notification
     if not response_body['app_is_healthy']:
-        error_message = 'A new snapshot cannot be taken now. Flink application {0} may not be healthy.'.format(
-            flink_app_name)
+        error_message = """
+                            Application Team:
+
+                            Snapshot Manager execution completed. Run Id: {0}. However, a new snapshot has not been 
+                            taken. The application {1} may not be healthy.""".format(snapshot_manager_run_id, flink_app_name)
+
         print(error_message)
-        notify_error(sns, sns_topic_arn, flink_app_name, snapshot_manager_run_id, error_message)
+        notify_error(sns, sns_topic_arn, error_message)
 
     # If new snapshot creation initiated then check if it is completed
     max_checks = 4
@@ -264,21 +275,14 @@ def delete_snapshot(kin_analytics, flink_app_name, snapshot):
     return is_snapshot_deleted
 
 
-def notify_when_app_is_not_running(sns, topic_arn, flink_app_name, snapshot_manager_run_id):
+def notify_error(sns, topic_arn, message):
     """
     This function sends a notification to Amazon SNS Topic
     :param sns:
     :param topic_arn:
-    :param flink_app_name:
-    :param snapshot_manager_run_id:
+    :param message:
     :return:
     """
-    message = """
-                Application Team:
-
-                Snapshot Manager execution completed. Run Id: {0}. However, a new snapshot has not been taken.
-                The application {1} is not running.
-                """.format(snapshot_manager_run_id, flink_app_name)
     try:
         pub_response = sns.publish(TopicArn=topic_arn, Message=message,
                                    Subject='Kinesis Data Analytics Flink Snapshot Manager Alert')
