@@ -1,4 +1,9 @@
-# Snapshot Manager - Amazon Kinesis Data Analytics for Apache Flink
+# Snapshot Manager - Amazon Managed Service for Apache Flink (formerly Amazon Kinesis Data Analytics)
+
+--------
+>  #### 🚨 August 30, 2023: Amazon Kinesis Data Analytics has been renamed to [Amazon Managed Service for Apache Flink](https://aws.amazon.com/managed-service-apache-flink).
+
+--------
 
 Snapshot Manager - [Amazon Kinesis Data Analytics](https://docs.aws.amazon.com/kinesisanalytics/latest/java/how-it-works.html) for Apache Flink offers the following benefits:
 
